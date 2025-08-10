@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>بازی دوندگی کارتونی - Created by Ahoora</title>
+<style>
+@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css');
+body {
+margin: 0; padding: 0; overflow: hidden;
+font-family: 'Vazir', sans-serif;
+background: linear-gradient(to top, #87ceeb 0%, #d4f1f9 100%);
+user-select: none;
+}
+#gameContainer {
+position: relative;
+width: 100vw; height: 100vh;
+overflow: hidden;
+background: linear-gradient(to top, #a0c4ff, #caf0f8);
+}
+canvas {
+display: block;
+margin: 0 auto;
+background: transparent;
+}
+#gameOverScreen {
+position: absolute;
+top: 50%; left: 50%;
+transform: translate(-50%, -50%);
+color: #d00000;
+font-size: 3rem;
+font-weight: bold;
+text-align: center;
+display: none;
+z-index: 10;
+text-shadow: 2px 2px 4px #000;
+}
+#scoreDisplay {
+position: absolute;
+top: 10px; left: 10px;
+color: #03045e;
+font-size: 1.5rem;
+font-weight: bold;
+text-shadow: 1px 1px 2px #fff;
+z-index: 5;
+}
+#creatorText {
+position: absolute;
+bottom: 10px; left: 50%;
+transform: translateX(-50%);
+font-size: 1rem;
+color: #03045e;
+font-weight: bold;
+user-select: none;
+}
+</style>
+</head>
+<body>
+<div id="gameContainer">
+<canvas id="gameCanvas" width="800" height="400"></canvas>
+<div id="gameOverScreen">wasted!!!</div>
+<div id="scoreDisplay">امتیاز: 0</div>
+<div id="creatorText">Created by Ahoora</div>
+</div>
+
+<script>
+(() => {
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const WIDTH = canvas.width;
+const HEIGHT = canvas.height;
+
+let gameSpeed = 5;
+let gravity = 0.8;
+let score = 0;
+let gameOver = false;
+
+let keys = {};
+let touchStartY = null;
+let touchEndY = null;
+
+// کنترل بازی
+
+class Player {
+constructor() {
+this.width = 50;
+this.height = 80;
+this.x = 50;
+this.y = HEIGHT - this.height - 40; // زمین
+this.velocityY = 0;
+this.isJumping = false;
+}
+draw() {
+// بدن
+ctx.fillStyle = '#343a40';
+ctx.fillRect(this.x, this.y, this.width, this.height);
+
+// سر (کارتونی شبیه گلزار)
+ctx.fillStyle = '#f1c27d';
+ctx.beginPath();
+ctx.ellipse(this.x + this.width / 2, this.y + 30, 25, 30, 0, 0, Math.PI * 2);
+ctx.fill();
+
+// مو
+ctx.fillStyle = '#3a2e2e';
+ctx.beginPath();
+ctx.moveTo(this.x + 10, this.y + 5);
+ctx.bezierCurveTo(this.x + 20, this.y - 20, this.x + 40, this.y - 10, this.x + 40, this.y + 20);
+ctx.fill();
+
+// ریش
+ctx.fillStyle = '#3a2e2e';
+ctx.beginPath();
+ctx.moveTo(this.x + 10, this.y + 60);
+ctx.lineTo(this.x + 40, this.y + 60);
+ctx.lineTo(this.x + 40, this.y + 80);
+ctx.lineTo(this.x + 10, this.y + 80);
+ctx.closePath();
+ctx.fill();
+
+// عینک آفتابی
+ctx.fillStyle = '#000000cc';
+ctx.fillRect(this.x + 12, this.y + 25, 25, 10);
+ctx.strokeStyle = '#222';
+ctx.lineWidth = 2;
+ctx.strokeRect(this.x + 12, this.y + 25, 25, 10);
+
+// بینی ساده
+ctx.strokeStyle = '#b68e54';
+ctx.lineWidth = 1;
+ctx.beginPath();
+ctx.moveTo(this.x + 24, this.y + 35);
+ctx.lineTo(this.x + 24, this.y + 45);
+ctx.stroke();
+}
+update() {
+this.velocityY += gravity;
+this.y += this.velocityY;
+
+if (this.y > HEIGHT - this.height - 40) {
+this.y = HEIGHT - this.height - 40;
+this.isJumping = false;
+this.velocityY = 0;
+}
+}
+jump() {
+if (!this.isJumping) {
+this.velocityY = -15;
+this.isJumping = true;
+}
+}
+}
+
+class Obstacle {
+constructor(type) {
+this.type = type;
+this.width = 50;
+this.height = 50;
+this.x = WIDTH + 50;
+this.y = HEIGHT - this.height - 40;
+this.speed = gameSpeed;
+}
+draw() {
+ctx.save();
+ctx.translate(this.x, this.y);
+
+switch (this.type) {
+case 'peugeot':
+// پژو کارتونی
+ctx.fillStyle = '#ff595e';
+ctx.fillRect(0, 20, 50, 30);
+ctx.fillStyle = '#6a4c93';
+ctx.fillRect(5, 0, 40, 30);
+// چرخ‌ها
+ctx.fillStyle = '#222';
+ctx.beginPath();
+ctx.arc(12, 50, 8, 0, Math.PI * 2);
+ctx.fill();
+ctx.beginPath();
+ctx.arc(38, 50, 8, 0, Math.PI * 2);
+ctx.fill();
+break;
+case 'pride':
+// پراید کارتونی
+ctx.fillStyle = '#1982c4';
+ctx.fillRect(0, 25, 50, 25);
+ctx.fillStyle = '#6a4c93';
+ctx.fillRect(5, 5, 40, 25);
+// چرخ‌ها
+ctx.fillStyle = '#222';
+ctx.beginPath();
+ctx.arc(12, 50, 7, 0, Math.PI * 2);
+ctx.fill();
+ctx.beginPath();
+ctx.arc(38, 50, 7, 0, Math.PI * 2);
+ctx.fill();
+break;
+case 'manhole':
+// درب فاضلاب
+ctx.fillStyle = '#555';
+ctx.beginPath();
+ctx.ellipse(25, 45, 25, 12, 0, 0, Math.PI * 2);
+ctx.fill();
+ctx.strokeStyle = '#333';
+ctx.lineWidth = 3;
+ctx.beginPath();
+for (let i = 0; i < 8; i++) {
+let angle = i * (Math.PI / 4);
+let x = 25 + 20 * Math.cos(angle);
+let y = 45 + 10 * Math.sin(angle);
+ctx.moveTo(25, 45);
+ctx.lineTo(x, y);
+}
+ctx.stroke();
+break;
+case 'trash':
+// سطل آشغال
+ctx.fillStyle = '#228b22';
+ctx.fillRect(15, 20, 20, 30);
+ctx.fillStyle = '#196619';
+ctx.fillRect(10, 10, 30, 15);
+ctx.strokeStyle = '#0c400c';
+ctx.lineWidth = 2;
+ctx.strokeRect(15, 20, 20, 30);
+break;
+default:
+// مانع پیش‌فرض: جعبه قهوه‌ای
+ctx.fillStyle = '#a0522d';
+ctx.fillRect(0, 20, 50, 30);
+}
+
+ctx.restore();
+}
+update() {
+this.x -= this.speed;
+this.speed = gameSpeed;
+}
+offscreen() {
+return this.x + this.width < 0;
+}
+collide(player) {
+let px = player.x;
+let py = player.y;
+let pw = player.width;
+let ph = player.height;
+
+let ox = this.x;
+let oy = this.y;
+let ow = this.width;
+let oh = this.height;
+
+return !(px > ox + ow || px + pw < ox || py > oy + oh || py + ph < oy);
+}
+}
+
+function drawBackground() {
+// آسمان
+let grad = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+grad.addColorStop(0, '#87ceeb');
+grad.addColorStop(1, '#d4f1f9');
+ctx.fillStyle = grad;
+ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+// زمین
+ctx.fillStyle = '#2d6a4f';
+ctx.fillRect(0, HEIGHT - 40, WIDTH, 40);
+
+// برج میلاد
+ctx.fillStyle = '#d62828';
+ctx.beginPath();
+ctx.moveTo(700, HEIGHT - 40);
+ctx.lineTo(720, 150);
+ctx.lineTo(730, 150);
+ctx.lineTo(750, HEIGHT - 40);
+ctx.closePath();
+ctx.fill();
+
+ctx.fillStyle = '#f77f00';
+ctx.fillRect(712, 150, 10, 40);
+ctx.fillRect(718, 100, 4, 50);
+
+// برج آزادی
+ctx.fillStyle = '#003049';
+ctx.fillRect(650, HEIGHT - 40, 20, 70);
+ctx.beginPath();
+ctx.moveTo(650, HEIGHT - 110);
+ctx.lineTo(670, HEIGHT - 110);
+ctx.lineTo(660, HEIGHT - 130);
+ctx.closePath();
+ctx.fill();
+
+// ساختمان های ساده
+ctx.fillStyle = '#6a4c93';
+ctx.fillRect(600, HEIGHT - 40, 40, 60);
+ctx.fillRect(550, HEIGHT - 40, 30, 50);
+ctx.fillRect(520, HEIGHT - 40, 20, 70);
+}
+
+// متغیرها و آرایه‌ها
+let player = new Player();
+let obstacles = [];
+
+let obstacleTimer = 0;
+let obstacleInterval = 1500;
+let lastTime = 0;
+
+function gameLoop(timestamp) {
+if (!lastTime) lastTime = timestamp;
+let deltaTime = timestamp - lastTime;
+lastTime = timestamp;
+
+ctx.clearRect(0, 0, WIDTH, HEIGHT);
+drawBackground();
+
+player.update();
+player.draw();
+
+obstacleTimer += deltaTime;
+if (obstacleTimer > obstacleInterval && !gameOver) {
+obstacleTimer = 0;
+
+// سخت‌تر شدن با افزایش سرعت و کاهش فاصله موانع
+if (gameSpeed < 12) gameSpeed += 0.15;
+if (obstacleInterval > 700) obstacleInterval -= 15;
+
+const obstacleTypes = ['peugeot', 'pride', 'manhole', 'trash'];
+let type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
+obstacles.push(new Obstacle(type));
+}
+
+for (let i = obstacles.length - 1; i >= 0; i--) {
+obstacles[i].speed = gameSpeed;
+obstacles[i].update();
+obstacles[i].draw();
+
+if (obstacles[i].collide(player)) {
+gameOver = true;
+document.getElementById('gameOverScreen').style.display = 'block';
+}
+if (obstacles[i].offscreen()) {
+obstacles.splice(i, 1);
+if (!gameOver) score++;
+}
+}
+
+if (!gameOver) {
+document.getElementById('scoreDisplay').textContent = 'امتیاز: ' + score;
+requestAnimationFrame(gameLoop);
+}
+}
+
+// رویدادهای کنترل
+
+window.addEventListener('keydown', e => {
+if ((e.code === 'Space' || e.key === ' ') && !gameOver) {
+player.jump();
+}
+if (e.code === 'Enter' && gameOver) {
+restartGame();
+}
+});
+
+canvas.addEventListener('touchstart', e => {
+touchStartY = e.changedTouches[0].clientY;
+}, { passive: true });
+
+canvas.addEventListener('touchend', e => {
+touchEndY = e.changedTouches[0].clientY;
+if (touchStartY - touchEndY > 30 && !gameOver) {
+player.jump();
+}
+}, { passive: true });
+
+function restartGame() {
+gameOver = false;
+obstacles = [];
+score = 0;
+gameSpeed = 5;
+obstacleInterval = 1500;
+player.y = HEIGHT - player.height - 40;
+player.velocityY = 0;
+player.isJumping = false;
+document.getElementById('gameOverScreen').style.display = 'none';
+requestAnimationFrame(gameLoop);
+}
+
+// شروع بازی
+requestAnimationFrame(gameLoop);
+})();
+</script>
+</body>
+</html>
